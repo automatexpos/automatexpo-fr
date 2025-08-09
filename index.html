@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Face Recognition (DeepFace) — Demo</title>
+  <style>
+    :root{--accent:#6366f1;--muted:#6b7280;--bg:#0f172a}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial;min-height:100vh;margin:0;background:linear-gradient(180deg,#0b1220 0%,#071026 100%);color:#e6eef8;display:flex;align-items:center;justify-content:center;padding:32px}
+    .card{width:920px;max-width:95%;background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.02));border-radius:14px;padding:26px;box-shadow:0 6px 24px rgba(2,6,23,0.6);backdrop-filter:blur(6px)}
+    h1{margin:0 0 6px;font-size:20px}
+    p.lead{color:var(--muted);margin:0 0 18px}
+    .row{display:flex;gap:18px}
+    .col{flex:1}
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=file]{display:block;margin-bottom:12px}
+    button{background:var(--accent);border:none;padding:10px 16px;border-radius:9px;color:white;font-weight:600;cursor:pointer}
+    .result{margin-top:18px;padding:14px;border-radius:10px;background:rgba(255,255,255,0.02);}
+    img.preview{max-width:100%;border-radius:8px;border:1px solid rgba(255,255,255,0.04)}
+    .small{font-size:13px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Face Recognition — Demo</h1>
+    <p class="lead">Upload an input image and one or more database images. The app will compare and return the best match (uses DeepFace on the server).</p>
+
+    <div class="row">
+      <div class="col">
+        <label for="inputImage">Input image</label>
+        <input id="inputImage" type="file" accept="image/*" />
+        <div id="inputPreview"></div>
+      </div>
+
+      <div class="col">
+        <label for="dbImages">Database images (choose multiple)</label>
+        <input id="dbImages" type="file" accept="image/*" multiple />
+        <div id="dbPreview" class="small"></div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <button id="matchBtn">Match Faces</button>
+      <span id="status" style="margin-left:12px" class="small"></span>
+    </div>
+
+    <div id="result" class="result" style="display:none">
+      <h3 id="resultTitle">Match Result</h3>
+      <div id="resultBody"></div>
+    </div>
+  </div>
+
+<script>
+const inputImage = document.getElementById('inputImage');
+const dbImages = document.getElementById('dbImages');
+const inputPreview = document.getElementById('inputPreview');
+const dbPreview = document.getElementById('dbPreview');
+const matchBtn = document.getElementById('matchBtn');
+const statusEl = document.getElementById('status');
+const resultEl = document.getElementById('result');
+const resultBody = document.getElementById('resultBody');
+
+inputImage.addEventListener('change', ()=>{
+  inputPreview.innerHTML='';
+  if(inputImage.files && inputImage.files[0]){
+    const url = URL.createObjectURL(inputImage.files[0]);
+    inputPreview.innerHTML = `<img class="preview" src="${url}" alt="input" style="max-width:300px"/>`;
+  }
+});
+
+dbImages.addEventListener('change', ()=>{
+  dbPreview.innerText = dbImages.files.length + ' file(s) selected';
+});
+
+matchBtn.addEventListener('click', async ()=>{
+  if(!inputImage.files.length){ alert('Please select input image'); return; }
+  if(!dbImages.files.length){ alert('Please select at least one database image'); return; }
+
+  const fd = new FormData();
+  fd.append('input_image', inputImage.files[0]);
+  for(let i=0;i<dbImages.files.length;i++) fd.append('db_images', dbImages.files[i]);
+
+  statusEl.innerText = 'Uploading...';
+  matchBtn.disabled = true;
+  resultEl.style.display='none';
+
+  try{
+    const res = await fetch('/api/match', { method: 'POST', body: fd });
+    const j = await res.json();
+    statusEl.innerText = '';
+    matchBtn.disabled = false;
+
+    if(j.error){ alert(j.error); return; }
+
+    if(j.matched_image_data){
+      resultEl.style.display='block';
+      resultBody.innerHTML = `\n        <p class="small">Overall match score: <strong>${j.match_percentage?.toFixed(2) ?? 'N/A'}%</strong></p>\n        <div style=\"display:flex;gap:14px;align-items:flex-start\">\n          <div style=\"flex:1\"><h4>Input</h4><img class=\"preview\" src=\"${URL.createObjectURL(inputImage.files[0])}\" alt=\"input\"/></div>\n          <div style=\"flex:1\"><h4>Matched</h4><img class=\"preview\" src=\"data:${j.matched_image_mime};base64,${j.matched_image_data}\" alt=\"matched\"/></div>\n        </div>`;
+    } else {
+      resultEl.style.display='block';
+      resultBody.innerHTML = '<p class="small">No match found.</p>';
+    }
+  }catch(err){
+    console.error(err);
+    alert('Request failed: '+err.message);
+    statusEl.innerText = '';
+    matchBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

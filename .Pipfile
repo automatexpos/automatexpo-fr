@@ -1,0 +1,11 @@
+[requires]
+python_version = "3.9"
+
+[packages]
+# Add your dependencies here
+flask = "*"
+tensorflow = "2.20.0"
+numpy = "*"
+pillow = "*"
+
+[dev-packages]
